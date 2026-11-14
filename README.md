@@ -26,3 +26,5 @@ bash models/download-ggml-model.sh base
 ```
 
 Requires `ffmpeg`. Needs ~150 MB RAM for the base model; transcribes ~3–4x faster than realtime on a modern CPU.
+
+**Crash protection (CLI):** audio is transcribed in 5-minute chunks (`CHUNK=60 ./transcribe.sh ...` to change), each chunk's text is kept on disk. If it crashes or you Ctrl-C, just run it again — finished chunks are skipped and it continues where it stopped. Delete the hidden `.name-chunks/` folder next to the input file to start over. Cuts at fixed times, so a word exactly at a chunk boundary can clip.
