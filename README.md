@@ -8,6 +8,8 @@ Convert MP4 (and other audio/video) files to text with [whisper.cpp](https://git
 
 Runs entirely in your browser via WebAssembly — your files never leave your machine. Powered by the official `whisper.wasm` example from whisper.cpp.
 
+**Crash protection:** transcription progress is autosaved in your browser at least once a minute. After a crash or accidental close: reload, load the same model + file, press Transcribe — it resumes from the last saved segment (with a 2 s overlap so no words are missed). "Clear saved progress" starts over.
+
 ## Local CLI (faster, no length limits)
 
 ```bash

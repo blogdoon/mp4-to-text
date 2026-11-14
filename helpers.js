@@ -12,6 +12,7 @@ var printTextarea = (function() {
     return function(text) {
         if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
         console.log(text);
+        if (window.onPrintLine) window.onPrintLine(text); // hook used by mp4-to-text for autosave/resume
         if (element) {
             element.value += text + "\n";
             element.scrollTop = element.scrollHeight; // focus on bottom

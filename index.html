@@ -188,6 +188,9 @@
                     <td>
                         <button onclick="onProcess(true);">Translate</button>
                     </td>
+                    <td>
+                        <button onclick="clearProgress();">Clear saved progress</button>
+                    </td>
                 </tr>
             </table>
 
@@ -255,6 +258,86 @@
             // the whisper instance
             var instance = null;
             var model_whisper = '';
+
+            //
+            // autosave / resume
+            //
+
+            const CKPT_KEY = 'mp4totext.ckpt';
+            var audioFP      = null;  // fingerprint of the loaded audio
+            var audioName    = '';
+            var audioDurMs   = 0;
+            var segLines     = [];    // completed "[00:01:23 --> 00:01:30] text" lines
+            var lastEndMs    = 0;
+            var lastSave     = 0;
+            var curTranslate = false;
+
+            function fmtTime(ms) {
+                var s = Math.floor(ms/1000);
+                function p2(v) { return (v < 10 ? '0' : '') + v; }
+                return p2(Math.floor(s/3600)) + ':' + p2(Math.floor(s/60)%60) + ':' + p2(s%60);
+            }
+
+            function readCkpt() {
+                try { return JSON.parse(localStorage.getItem(CKPT_KEY)); } catch (e) { return null; }
+            }
+
+            function saveProgress(force) {
+                var now = Date.now();
+                if (!force && now - lastSave < 60000) return;  // autosave at most once a minute
+                if (!audioFP || segLines.length === 0) return;
+                lastSave = now;
+                localStorage.setItem(CKPT_KEY, JSON.stringify({
+                    fp: audioFP, name: audioName, model: model_whisper,
+                    lang: document.getElementById('language').value,
+                    translate: curTranslate,
+                    endMs: lastEndMs, lines: segLines
+                }));
+                printTextarea('js: progress autosaved at ' + fmtTime(lastEndMs));
+            }
+
+            function finishRun() {
+                if (audioDurMs > 0 && lastEndMs >= audioDurMs - 3000) {
+                    localStorage.removeItem(CKPT_KEY);
+                    printTextarea('js: transcription complete - saved progress cleared');
+                } else if (segLines.length) {
+                    saveProgress(true);
+                }
+            }
+
+            function clearProgress() {
+                localStorage.removeItem(CKPT_KEY);
+                segLines = []; lastEndMs = 0;
+                printTextarea('js: saved progress cleared');
+            }
+
+            // called from helpers.js printTextarea on every printed line
+            window.onPrintLine = function(text) {
+                // segment line, e.g. "[00:00:00.000 --> 00:00:10.600]  And so ..."
+                var m = /^\[(\d+):(\d+):(\d+)\.(\d+)\s+-->\s+(\d+):(\d+):(\d+)\.(\d+)\]\s*(.*)$/.exec(text);
+                if (m) {
+                    segLines.push(text);
+                    lastEndMs = ((+m[5]*3600 + +m[6]*60 + +m[7])*1000) + +m[8];
+                    saveProgress(false);
+                    return;
+                }
+                // whisper_print_timings lines signal the end of a transcription run
+                if (/whisper_print_timings/.test(text)) {
+                    finishRun();
+                }
+            };
+
+            // cheap FNV-1a hash of the decoded PCM - identifies the same audio after a crash
+            function fingerprintAudio(f32) {
+                var h = 0x811c9dc5;
+                var ints = new Int32Array(f32.buffer, f32.byteOffset, f32.length);
+                for (var i = 0; i < ints.length; i++) {
+                    h ^= ints[i]; h = (h * 0x01000193)|0;
+                }
+                return f32.length + ':' + (h >>> 0).toString(16);
+            }
+
+            window.addEventListener('beforeunload', function() { saveProgress(true); });
 
             // helper function
             function convertTypedArray(src, type) {
@@ -476,6 +559,10 @@
                                 printTextarea('js: truncated audio to first ' + kMaxAudio_s + ' seconds');
                             }
 
+                            audioFP    = fingerprintAudio(audio);
+                            audioName  = file.name;
+                            audioDurMs = audio.length/16;
+
                             setAudio(audio);
                         });
                     }, function(e) {
@@ -630,13 +717,35 @@
                     return;
                 }
 
+                curTranslate = translate;
+                segLines = []; lastEndMs = 0;
+                var startMs = 0;
+
+                var ck = readCkpt();
+                if (ck && ck.fp === audioFP && ck.model === model_whisper &&
+                    ck.lang === document.getElementById('language').value &&
+                    ck.translate === translate && ck.endMs > 0) {
+                    if (ck.endMs >= audioDurMs - 3000) {
+                        printTextarea('js: this audio was already fully transcribed (up to ' + fmtTime(ck.endMs) + ') - press "Clear saved progress" to redo');
+                        return;
+                    }
+                    // resume just before the last saved segment so no words are missed
+                    startMs = Math.max(0, ck.endMs - 2000);
+                    segLines = ck.lines;
+                    lastEndMs = ck.endMs;
+                    document.getElementById('output').value = segLines.join('\n') + '\n';
+                    printTextarea('js: resuming "' + (ck.name || 'this audio') + '" from ' + fmtTime(ck.endMs) + ' (' + segLines.length + ' segments restored)');
+                } else if (ck && ck.fp !== audioFP) {
+                    printTextarea('js: (ignoring saved progress from another file: "' + (ck.name || '?') + '")');
+                }
+
                 if (instance) {
                     printTextarea('');
                     printTextarea('js: processing - this might take a while ...');
                     printTextarea('');
 
                     setTimeout(function() {
-                        var ret = Module.full_default(instance, audio, document.getElementById('language').value, nthreads, translate);
+                        var ret = Module.full_default(instance, audio, document.getElementById('language').value, nthreads, translate, startMs);
                         console.log('js: full_default returned: ' + ret);
                         if (ret) {
                             printTextarea("js: whisper returned: " + ret);
