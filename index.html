@@ -4,24 +4,85 @@
         <title>MP4 to Text — free, in your browser</title>
 
         <style>
+            :root {
+                --bg: #f6f7f8;
+                --card: #ffffff;
+                --border: #e4e7eb;
+                --text: #1a1d21;
+                --muted: #6b7280;
+            }
+            * { box-sizing: border-box; }
+            body {
+                background: var(--bg);
+                color: var(--text);
+                font: 15px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+                margin: 0;
+                padding: 36px 16px;
+            }
+            #main-container {
+                max-width: 860px;
+                margin: 0 auto;
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 14px;
+                padding: 28px 32px;
+            }
+            h1 { font-size: 19px; font-weight: 600; margin: 0 0 10px; }
+            a { color: var(--text); }
+            ul { margin: 8px 0; padding-left: 22px; }
+            li { margin: 3px 0; }
+            .muted { color: var(--muted); font-size: 13px; }
+            button {
+                font: inherit;
+                padding: 7px 14px;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                background: var(--card);
+                color: var(--text);
+                cursor: pointer;
+            }
+            button:hover:not(:disabled) { background: #f0f2f4; }
+            button:disabled { opacity: 0.45; cursor: default; }
+            select { font: inherit; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+            input[type="file"] { font-size: 13px; max-width: 100%; }
+            details { margin: 14px 0; }
+            summary { cursor: pointer; color: var(--muted); }
+            hr { border: none; border-top: 1px solid var(--border); margin: 22px 0; }
+            table td { padding: 4px 14px 4px 0; vertical-align: middle; }
+            .card-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                margin: 0 0 10px;
+            }
+            #transcript {
+                min-height: 110px;
+                max-height: 440px;
+                overflow: auto;
+                white-space: pre-wrap;
+                font-size: 15px;
+                line-height: 1.7;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 14px 18px;
+                background: var(--card);
+            }
+            #transcript:empty::after { content: "The transcript will appear here as it is generated."; color: var(--muted); }
             #output {
                 width: 100%;
-                height: 100%;
-                margin: 0 auto;
-                margin-top: 10px;
-                border-left: 0px;
-                border-right: 0px;
-                padding-left: 0px;
-                padding-right: 0px;
+                max-height: 170px;
+                margin: 0;
                 display: block;
-                background-color: black;
-                color: white;
-                font-size: 10px;
-                font-family: 'Lucida Console', Monaco, monospace;
+                background: #f8f9fb;
+                color: var(--muted);
+                font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 10px 12px;
                 outline: none;
-                white-space: pre;
-                overflow-wrap: normal;
-                overflow-x: scroll;
+                white-space: pre-wrap;
+                overflow: auto;
             }
         </style>
         <script src="coi-serviceworker.js"></script>
@@ -29,28 +90,27 @@
     </head>
     <body>
         <div id="main-container">
-            <b>Convert MP4 &amp; audio to text — 100% in your browser, your files never leave your machine</b>
+            <h1>MP4 → Text</h1>
+            <div class="muted">Convert audio &amp; video to text — 100% in your browser, your files never leave your machine.</div>
 
-            <br><br>
+            <br>
 
-            Usage instructions:<br>
+            Usage instructions:
             <ul>
-                <li>Select an audio or video file to transcribe (sample: <a href="https://whisper.ggerganov.com/jfk.wav">jfk.wav</a>) - the model loads automatically on your first Transcribe click (57 MB, cached after that). Documents like .doc/.pdf don't work - audio/video only.</li>
-                <li>Click on the "Transcribe" button</li>
+                <li>Select an audio or video file to transcribe (sample: <a href="https://whisper.ggerganov.com/jfk.wav">jfk.wav</a>) — the model loads automatically on your first Transcribe click (57&nbsp;MB, cached after that). Documents like .doc/.pdf don't work — audio/video only.</li>
+                <li>Click "Transcribe". The transcript appears below — use <b>Copy</b> or <b>Download .txt</b> to save it. Progress is autosaved every minute: after a crash, press Transcribe again to resume.</li>
             </ul>
 
-            Note that the computation is quite heavy and may take a few seconds to complete.<br>
-            The transcription results will be displayed in the text area below.<br><br>
-            <b>Important:</b>
+            <details>
+                <summary>Requirements &amp; other models</summary>
                 <ul>
                     <li>your browser must support WASM SIMD instructions for this to work</li>
                     <li>Firefox cannot load files larger than 256 MB - use Chrome instead</li>
                 </ul>
-            <hr>
 
-            <div id="model">
-                Whisper models: <span id="model-whisper-status"></span><br><br>
-                <button id="fetch-whisper-tiny-en"  onclick="loadWhisper('tiny.en')">tiny.en (75 MB)</button>
+                <div id="model">
+                    Whisper models: <span id="model-whisper-status"></span><br><br>
+                    <button id="fetch-whisper-tiny-en"  onclick="loadWhisper('tiny.en')">tiny.en (75 MB)</button>
                 <button id="fetch-whisper-tiny"     onclick="loadWhisper('tiny')">tiny (75 MB)</button>
                 <button id="fetch-whisper-base-en"  onclick="loadWhisper('base.en')">base.en (142 MB)</button>
                 <button id="fetch-whisper-base"     onclick="loadWhisper('base')">base (142 MB)</button>
@@ -69,7 +129,8 @@
                 <button id="fetch-whisper-medium-q5_0"    onclick="loadWhisper('medium-q5_0')">medium (Q5_0, 515 MB)</button>
                 <button id="fetch-whisper-large-q5_0"     onclick="loadWhisper('large-q5_0')">large (Q5_0, 1030 MB)</button>
                 <span id="fetch-whisper-progress"></span>
-            </div>
+                </div>
+            </details>
 
             <br>
 
@@ -195,8 +256,20 @@
 
             <br>
 
+            <div class="card-head">
+                <b>Transcript</b>
+                <span>
+                    <button id="btn-copy" onclick="copyTranscript()" disabled>Copy</button>
+                    <button id="btn-download" onclick="downloadTranscript()" disabled>Download .txt</button>
+                </span>
+            </div>
+            <div id="transcript"></div>
+
+            <br>
+
+            <div class="card-head"><span class="muted">Log (technical details)</span></div>
             <!-- textarea with height filling the rest of the page -->
-            <textarea id="output" rows="20"></textarea>
+            <textarea id="output" rows="6"></textarea>
 
             <br><br>
 
@@ -320,6 +393,7 @@
                     segLines.push(text);
                     lastEndMs = ((+m[5]*3600 + +m[6]*60 + +m[7])*1000) + +m[8];
                     saveProgress(false);
+                    updateTranscript();
                     return;
                 }
                 // whisper_print_timings lines signal the end of a transcription run
@@ -327,6 +401,46 @@
                     finishRun();
                 }
             };
+
+            //
+            // transcript copy / download
+            //
+
+            function transcriptText() {
+                return segLines.map(function(l) { return l.replace(/^\[[^\]]*\]\s*/, ''); }).join('\n');
+            }
+
+            function updateTranscript() {
+                var el = document.getElementById('transcript');
+                el.textContent = transcriptText();
+                el.scrollTop = el.scrollHeight;
+                setExportEnabled(segLines.length > 0);
+            }
+
+            function setExportEnabled(on) {
+                document.getElementById('btn-copy').disabled = !on;
+                document.getElementById('btn-download').disabled = !on;
+            }
+
+            function copyTranscript() {
+                navigator.clipboard.writeText(transcriptText()).then(function() {
+                    var b = document.getElementById('btn-copy');
+                    b.textContent = 'Copied!';
+                    setTimeout(function() { b.textContent = 'Copy'; }, 1500);
+                }, function() {
+                    printTextarea('js: copy failed - use "Download .txt" instead');
+                });
+            }
+
+            function downloadTranscript() {
+                var base = (audioName || 'transcript').replace(/\.[^.]+$/, '');
+                var blob = new Blob([transcriptText()], { type: 'text/plain' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = base + '.txt';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
 
             // cheap FNV-1a hash of the decoded PCM - identifies the same audio after a crash
             function fingerprintAudio(f32) {
@@ -739,6 +853,8 @@
 
                 curTranslate = translate;
                 segLines = []; lastEndMs = 0;
+                document.getElementById('transcript').textContent = '';
+                setExportEnabled(false);
                 var startMs = 0;
 
                 var ck = readCkpt();
@@ -754,6 +870,7 @@
                     segLines = ck.lines;
                     lastEndMs = ck.endMs;
                     document.getElementById('output').value = segLines.join('\n') + '\n';
+                    updateTranscript();
                     printTextarea('js: resuming "' + (ck.name || 'this audio') + '" from ' + fmtTime(ck.endMs) + ' (' + segLines.length + ' segments restored)');
                 } else if (ck && ck.fp !== audioFP) {
                     printTextarea('js: (ignoring saved progress from another file: "' + (ck.name || '?') + '")');
