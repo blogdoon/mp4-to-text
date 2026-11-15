@@ -35,8 +35,7 @@
 
             Usage instructions:<br>
             <ul>
-                <li>Load a Whisper model below (recommended: <b>base (Q5_1)</b> — good quality, only 57 MB, loads once and is cached)</li>
-                <li>Select an audio or video file to transcribe (sample: <a href="https://whisper.ggerganov.com/jfk.wav">jfk.wav</a>)</li>
+                <li>Select an audio or video file to transcribe (sample: <a href="https://whisper.ggerganov.com/jfk.wav">jfk.wav</a>) - the model loads automatically on your first Transcribe click (57 MB, cached after that). Documents like .doc/.pdf don't work - audio/video only.</li>
                 <li>Click on the "Transcribe" button</li>
             </ul>
 
@@ -85,7 +84,7 @@
 
             <div id="input_file">
                 Audio file:
-                <input type="file" id="file" name="file" onchange="loadAudio(event)" />
+                <input type="file" id="file" name="file" accept="audio/*,video/*" onchange="loadAudio(event)" />
             </div>
 
             <div id="input_mic" style="display: none;">
@@ -258,6 +257,8 @@
             // the whisper instance
             var instance = null;
             var model_whisper = '';
+            var modelLoaded = false;      // a whisper model has been fetched into the FS
+            var pendingProcess = null;    // {translate} waiting for the model to finish loading
 
             //
             // autosave / resume
@@ -372,6 +373,12 @@
                 printTextarea('storeFS: stored model: ' + fname + ' size: ' + buf.length);
 
                 document.getElementById('model').innerHTML = 'Model fetched: ' + model_whisper;
+
+                modelLoaded = true;
+                if (pendingProcess) {
+                    var p = pendingProcess; pendingProcess = null;
+                    onProcess(p.translate);
+                }
             }
 
             function loadFile(event, fname) {
@@ -535,6 +542,11 @@
                     return;
                 }
 
+                if (file.type && !file.type.startsWith('audio') && !file.type.startsWith('video')) {
+                    printTextarea('js: "' + file.name + '" is not an audio or video file - select an mp4/mp3/wav/etc.');
+                    return;
+                }
+
                 printTextarea('js: loading audio: ' + file.name + ', size: ' + file.size + ' bytes');
                 printTextarea('js: please wait ...');
 
@@ -567,6 +579,7 @@
                         });
                     }, function(e) {
                         printTextarea('js: error decoding audio: ' + e);
+                        printTextarea('js: hint: only audio/video files work here (.mp4 .mp3 .wav .m4a ...) - documents like .doc/.pdf cannot be transcribed');
                         audio = null;
                         setAudio(audio);
                     });
@@ -699,6 +712,13 @@
 
             function onProcess(translate) {
                 if (!instance) {
+                    if (!modelLoaded) {
+                        // auto-fetch the recommended model once, then retry
+                        printTextarea('js: no model loaded - fetching base (Q5_1, 57 MB), first time only ...');
+                        pendingProcess = { translate: translate };
+                        loadWhisper('base-q5_1');
+                        return;
+                    }
                     instance = Module.init('whisper.bin');
 
                     if (instance) {
